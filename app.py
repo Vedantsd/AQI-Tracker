@@ -1,10 +1,11 @@
 from flask import Flask, jsonify, render_template, request
 import time
 import threading
-
+import requests
 app = Flask(__name__)
 
-# In-memory storage for the latest sensor data
+city = "Unknown"
+
 latest_sensor_data = {
     "aqi": None,
     "temperature": None,
@@ -13,18 +14,33 @@ latest_sensor_data = {
     "city": None
 }
 
-
-def get_user_city_from_ip():
-    """Optional: Keep IP lookup for user display."""
-    try:
-        client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if not client_ip or client_ip.startswith(('127.', '192.168.', '172.', '10.', '::1')):
-            return "Local Network"
-        return client_ip
-    except Exception:
-        return "Unknown"
-
-
+def fetch_location_data():
+    apis = [
+        {
+            'url': 'https://ipinfo.io/json',
+            'city_key': 'city',
+            'country_key': 'country',
+            'lat_key': None  
+        },
+    ]
+        
+    for api in apis:
+        try:
+            print(f"Trying API: {api['url']}")
+            response = requests.get(api['url'], timeout=10)
+                
+            if response.status_code == 200:
+                data = response.json()
+                print(f"API Response: {data}")
+                    
+                city = data.get(api['city_key'], 'Unknown')
+                country = data.get(api['country_key'], 'Unknown')
+                st = f"{city}, {country}"
+                return st
+        except:
+            return "Unknown"        
+        
+    
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -32,7 +48,6 @@ def index():
 
 @app.route('/receive_data', methods=['POST'])
 def receive_data():
-    """Receive air quality sensor data from ESP32."""
     global latest_sensor_data
 
     try:
@@ -40,12 +55,10 @@ def receive_data():
         if not data:
             return jsonify({"status": "error", "message": "No JSON data received"}), 400
 
-        # Extract expected fields
         aqi = data.get("aqi")
         temp = data.get("temperature")
         hum = data.get("humidity")
 
-        # Validate required data
         if aqi is None:
             return jsonify({"status": "error", "message": "Missing 'aqi' in request"}), 400
 
@@ -54,7 +67,7 @@ def receive_data():
             "temperature": temp,
             "humidity": hum,
             "timestamp": time.time(),
-            "city": get_user_city_from_ip()
+            "city": city
         })
 
         print(f"Received from ESP32 -> AQI: {aqi}, Temp: {temp}, Humidity: {hum}")
@@ -68,7 +81,6 @@ def receive_data():
 
 @app.route('/api/airquality', methods=['GET'])
 def air_quality_api():
-    """Return the latest real sensor data."""
     if latest_sensor_data["aqi"] is None:
         return jsonify({"status": "error", "message": "No sensor data received yet"}), 404
 
@@ -79,4 +91,5 @@ def air_quality_api():
 
 
 if __name__ == '__main__':
+    city = fetch_location_data()
     app.run(host='0.0.0.0', port=5000, debug=True)
