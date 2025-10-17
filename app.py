@@ -2,9 +2,18 @@ from flask import Flask, jsonify, render_template, request
 import time
 import threading
 import requests
+import smtplib
+import os
+import mimetypes
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+load_dotenv()
 app = Flask(__name__)
 
 city = "Unknown"
+sender = os.getenv("email")
+password = os.getenv("password")
 
 latest_sensor_data = {
     "aqi": None,
@@ -13,6 +22,41 @@ latest_sensor_data = {
     "timestamp": None,
     "city": None
 }
+
+def send_otp_email(receiver):
+    """Send OTP via email"""
+    message = MIMEMultipart()
+    message["From"] = sender
+    message["To"] = receiver
+    message["Subject"] = "HIGH AQI Warning"
+
+    body = f"""
+    The AQI is too high today, you may burn, go back home!!!
+    """
+    
+    message.attach(MIMEText(body, "plain"))
+
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, receiver, message.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"❌ Error sending email: {e}")
+        return False, str(e)
+    
+
+def send_bulk_email():
+    with open("emails.csv") as csv_file:
+        data = csv_file.read()
+        emails = data.split(',')
+        for email in emails: 
+            email.replace('\n', '')
+            email.replace(',', '')
+            send_otp_email(email)
+
 
 def fetch_location_data():
     apis = [
