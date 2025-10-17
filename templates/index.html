@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Air Quality Monitor</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        #warning-popup {
+            z-index: 100; 
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+
+        .aqi-card-container {
+            max-width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 1rem;
+        }
+
+        @media (min-width: 640px) {
+            .aqi-card-container {
+                max-width: 28rem; 
+                padding: 2rem;
+            }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'maroon': '#800000',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center font-sans">
+
+    <div class="aqi-card-container bg-white shadow-2xl rounded-xl p-6 md:p-10 transform hover:scale-[1.02] transition duration-300">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-gray-800 tracking-tight">
+                Air Pollution Tracker
+            </h1>
+            <p class="text-sm text-gray-500 mt-1" id="location-display">
+                Location: Fetching...
+            </p>
+        </header>
+
+        <div class="flex flex-col items-center justify-center my-8">
+            <div id="aqi-ring" class="relative w-40 h-40 md:w-52 md:h-52 flex items-center justify-center rounded-full border-8 transition duration-500 ease-in-out border-gray-200">
+                <span id="aqi-value" class="text-5xl md:text-7xl font-bold text-gray-800">--</span>
+            </div>
+            <p id="aqi-status" class="text-2xl md:text-3xl font-semibold mt-4 py-1 px-4 rounded-full text-white shadow-lg transition duration-500 ease-in-out">
+                Loading...
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+                Last updated: <span id="last-updated">--:--:--</span>
+            </p>
+        </div>
+
+        <div class="bg-gray-100 p-4 rounded-lg shadow-inner mt-6">
+            <h3 class="font-bold text-lg text-gray-700 mb-2 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                </svg>
+                Health Recommendations
+            </h3>
+            <p id="health-advice" class="text-gray-600 text-sm italic">
+                Awaiting data to provide advice...
+            </p>
+        </div>
+    </div>
+
+    <div id="warning-popup" class="fixed inset-0 bg-red-800 bg-opacity-95 hidden flex items-center justify-center opacity-0 transform scale-95 pointer-events-none">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-10 text-center max-w-sm md:max-w-md mx-4 border-4 border-red-500 animate-pulse">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-red-600 mb-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.765 1.36-.212 3.099-1.743 3.099H4.42c-1.53 0-2.508-1.739-1.743-3.099l5.58-9.92zM10 11a1 1 0 100-2 1 1 0 000 2zm1-4a1 1 0 10-2 0 1 1 0 002 0z" clip-rule="evenodd" />
+            </svg>
+            <h2 class="text-3xl font-bold text-red-700 mb-2">
+                ⚠️ AIR QUALITY WARNING ⚠️
+            </h2>
+            <p class="text-gray-700 text-lg mb-4">
+                Air Quality Index is at <span id="popup-aqi-value" class="font-extrabold text-red-600">--</span>.
+            </p>
+            <p class="text-gray-600 font-medium">
+                The air quality is currently **UNHEALTHY**. Please limit prolonged outdoor exertion and follow local health advisories.
+            </p>
+            <button onclick="document.getElementById('warning-popup').classList.add('hidden'); document.getElementById('warning-popup').classList.remove('opacity-100', 'scale-100'); document.getElementById('warning-popup').classList.add('opacity-0', 'scale-95');"
+                class="mt-6 px-6 py-3 bg-red-500 text-white font-bold rounded-full shadow-lg hover:bg-red-600 transition duration-200">
+                Acknowledge & Close
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const AQI_MAPPINGS = [
+            { max: 50, status: "Good", color: "bg-green-500", ringColor: "border-green-500", advice: "Air quality is satisfactory. Enjoy outdoor activities as normal." },
+            { max: 100, status: "Moderate", color: "bg-yellow-500", ringColor: "border-yellow-500", advice: "Air quality is acceptable. Unusually sensitive individuals should consider limiting prolonged outdoor exertion." },
+            { max: 150, status: "Poor", color: "bg-orange-500", ringColor: "border-orange-500", advice: "Members of sensitive groups should reduce prolonged or heavy outdoor exertion. The general public is not likely to be affected." },
+            { max: 200, status: "Unhealthy", color: "bg-red-500", ringColor: "border-red-500", advice: "Everyone may begin to experience health effects; members of sensitive groups may experience more serious effects. Avoid outdoor physical activity." },
+            { max: 300, status: "Very Unhealthy", color: "bg-purple-500", ringColor: "border-purple-500", advice: "Health alert! The risk of health effects is increased for everyone. Children, elderly, and those with heart/lung disease should stay indoors." },
+            { max: 500, status: "Hazardous", color: "bg-maroon", ringColor: "border-maroon", advice: "Health warning of emergency conditions. Everyone is more likely to be affected. Avoid all outdoor physical activity." }
+        ];
+
+        const POPUP_THRESHOLD = 151; 
+
+        const aqiValueEl = document.getElementById('aqi-value');
+        const aqiStatusEl = document.getElementById('aqi-status');
+        const aqiRingEl = document.getElementById('aqi-ring');
+        const healthAdviceEl = document.getElementById('health-advice');
+        const lastUpdatedEl = document.getElementById('last-updated');
+        const locationDisplayEl = document.getElementById('location-display');
+        
+        const warningPopupEl = document.getElementById('warning-popup');
+        const popupAqiValueEl = document.getElementById('popup-aqi-value');
+
+        function getAqiCategory(aqi) {
+            for (const category of AQI_MAPPINGS) {
+                if (aqi <= category.max) {
+                    return category;
+                }
+            }
+            return AQI_MAPPINGS[AQI_MAPPINGS.length - 1];
+        }
+
+        function handleWarningPopup(aqi) {
+            if (aqi >= POPUP_THRESHOLD) {
+                popupAqiValueEl.textContent = aqi;
+                warningPopupEl.classList.remove('hidden');
+                setTimeout(() => {
+                    warningPopupEl.classList.add('opacity-100', 'scale-100');
+                    warningPopupEl.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+                }, 10); 
+            } else {
+                warningPopupEl.classList.remove('opacity-100', 'scale-100');
+                warningPopupEl.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+                setTimeout(() => {
+                    warningPopupEl.classList.add('hidden');
+                }, 300); 
+            }
+        }
+
+        async function fetchAirQualityData() {
+            try {
+                const response = await fetch('/api/airquality');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                const aqi = data.aqi;
+                const category = getAqiCategory(aqi);
+
+                aqiValueEl.textContent = aqi;
+                aqiRingEl.classList.forEach(className => {
+                    if (className.startsWith('border-')) {
+                        aqiRingEl.classList.remove(className);
+                    }
+                });
+                aqiRingEl.classList.add(category.ringColor);
+
+                aqiStatusEl.textContent = category.status;
+                aqiStatusEl.classList.forEach(className => {
+                    if (className.startsWith('bg-')) {
+                        aqiStatusEl.classList.remove(className);
+                    }
+                });
+                aqiStatusEl.classList.add(category.color);
+                
+                healthAdviceEl.textContent = category.advice;
+
+                const now = new Date();
+                lastUpdatedEl.textContent = now.toLocaleTimeString();
+                locationDisplayEl.textContent = `Location: ${data.city}`;
+                
+                handleWarningPopup(aqi);
+
+            } catch (error) {
+                console.error("Could not fetch air quality data:", error);
+                aqiValueEl.textContent = 'ERR';
+                aqiStatusEl.textContent = 'Error';
+                healthAdviceEl.textContent = 'Failed to load air quality data. Check server connection.';
+            }
+        }
+
+        window.onload = function() {
+            fetchAirQualityData();            
+            setInterval(fetchAirQualityData, 5000); 
+        };
+    </script>
+</body>
+</html>
