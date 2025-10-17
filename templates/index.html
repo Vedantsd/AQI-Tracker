@@ -100,99 +100,104 @@
     </div>
 
     <script>
-        const AQI_MAPPINGS = [
-            { max: 50, status: "Good", color: "bg-green-500", ringColor: "border-green-500", advice: "Air quality is satisfactory. Enjoy outdoor activities as normal." },
-            { max: 100, status: "Moderate", color: "bg-yellow-500", ringColor: "border-yellow-500", advice: "Air quality is acceptable. Unusually sensitive individuals should consider limiting prolonged outdoor exertion." },
-            { max: 150, status: "Poor", color: "bg-orange-500", ringColor: "border-orange-500", advice: "Members of sensitive groups should reduce prolonged or heavy outdoor exertion. The general public is not likely to be affected." },
-            { max: 200, status: "Unhealthy", color: "bg-red-500", ringColor: "border-red-500", advice: "Everyone may begin to experience health effects; members of sensitive groups may experience more serious effects. Avoid outdoor physical activity." },
-            { max: 300, status: "Very Unhealthy", color: "bg-purple-500", ringColor: "border-purple-500", advice: "Health alert! The risk of health effects is increased for everyone. Children, elderly, and those with heart/lung disease should stay indoors." },
-            { max: 500, status: "Hazardous", color: "bg-maroon", ringColor: "border-maroon", advice: "Health warning of emergency conditions. Everyone is more likely to be affected. Avoid all outdoor physical activity." }
-        ];
+    const AQI_MAPPINGS = [
+        { max: 50, status: "Good", color: "bg-green-500", ringColor: "border-green-500", advice: "Air quality is satisfactory. Enjoy outdoor activities as normal." },
+        { max: 100, status: "Moderate", color: "bg-yellow-500", ringColor: "border-yellow-500", advice: "Air quality is acceptable. Sensitive individuals should limit prolonged exertion." },
+        { max: 150, status: "Poor", color: "bg-orange-500", ringColor: "border-orange-500", advice: "Sensitive groups should reduce prolonged or heavy outdoor exertion." },
+        { max: 200, status: "Unhealthy", color: "bg-red-500", ringColor: "border-red-500", advice: "Everyone may begin to experience health effects; limit outdoor activity." },
+        { max: 300, status: "Very Unhealthy", color: "bg-purple-500", ringColor: "border-purple-500", advice: "Health alert! Everyone should avoid outdoor activity." },
+        { max: 500, status: "Hazardous", color: "bg-maroon", ringColor: "border-maroon", advice: "Emergency conditions. Stay indoors and use air purifiers if possible." }
+    ];
 
-        const POPUP_THRESHOLD = 151; 
+    const POPUP_THRESHOLD = 151;
 
-        const aqiValueEl = document.getElementById('aqi-value');
-        const aqiStatusEl = document.getElementById('aqi-status');
-        const aqiRingEl = document.getElementById('aqi-ring');
-        const healthAdviceEl = document.getElementById('health-advice');
-        const lastUpdatedEl = document.getElementById('last-updated');
-        const locationDisplayEl = document.getElementById('location-display');
-        
-        const warningPopupEl = document.getElementById('warning-popup');
-        const popupAqiValueEl = document.getElementById('popup-aqi-value');
+    const aqiValueEl = document.getElementById('aqi-value');
+    const aqiStatusEl = document.getElementById('aqi-status');
+    const aqiRingEl = document.getElementById('aqi-ring');
+    const healthAdviceEl = document.getElementById('health-advice');
+    const lastUpdatedEl = document.getElementById('last-updated');
+    const locationDisplayEl = document.getElementById('location-display');
 
-        function getAqiCategory(aqi) {
-            for (const category of AQI_MAPPINGS) {
-                if (aqi <= category.max) {
-                    return category;
-                }
-            }
-            return AQI_MAPPINGS[AQI_MAPPINGS.length - 1];
-        }
+    const warningPopupEl = document.getElementById('warning-popup');
+    const popupAqiValueEl = document.getElementById('popup-aqi-value');
 
-        function handleWarningPopup(aqi) {
-            if (aqi >= POPUP_THRESHOLD) {
-                popupAqiValueEl.textContent = aqi;
-                warningPopupEl.classList.remove('hidden');
-                setTimeout(() => {
-                    warningPopupEl.classList.add('opacity-100', 'scale-100');
-                    warningPopupEl.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
-                }, 10); 
-            } else {
-                warningPopupEl.classList.remove('opacity-100', 'scale-100');
-                warningPopupEl.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
-                setTimeout(() => {
-                    warningPopupEl.classList.add('hidden');
-                }, 300); 
+    function getAqiCategory(aqi) {
+        for (const category of AQI_MAPPINGS) {
+            if (aqi <= category.max) {
+                return category;
             }
         }
+        return AQI_MAPPINGS[AQI_MAPPINGS.length - 1];
+    }
 
-        async function fetchAirQualityData() {
-            try {
-                const response = await fetch('/api/airquality');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                const aqi = data.aqi;
-                const category = getAqiCategory(aqi);
-
-                aqiValueEl.textContent = aqi;
-                aqiRingEl.classList.forEach(className => {
-                    if (className.startsWith('border-')) {
-                        aqiRingEl.classList.remove(className);
-                    }
-                });
-                aqiRingEl.classList.add(category.ringColor);
-
-                aqiStatusEl.textContent = category.status;
-                aqiStatusEl.classList.forEach(className => {
-                    if (className.startsWith('bg-')) {
-                        aqiStatusEl.classList.remove(className);
-                    }
-                });
-                aqiStatusEl.classList.add(category.color);
-                
-                healthAdviceEl.textContent = category.advice;
-
-                const now = new Date();
-                lastUpdatedEl.textContent = now.toLocaleTimeString();
-                locationDisplayEl.textContent = `Location: ${data.city}`;
-                
-                handleWarningPopup(aqi);
-
-            } catch (error) {
-                console.error("Could not fetch air quality data:", error);
-                aqiValueEl.textContent = 'ERR';
-                aqiStatusEl.textContent = 'Error';
-                healthAdviceEl.textContent = 'Failed to load air quality data. Check server connection.';
-            }
+    function handleWarningPopup(aqi) {
+        if (aqi >= POPUP_THRESHOLD) {
+            popupAqiValueEl.textContent = aqi;
+            warningPopupEl.classList.remove('hidden');
+            setTimeout(() => {
+                warningPopupEl.classList.add('opacity-100', 'scale-100');
+                warningPopupEl.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+            }, 10);
+        } else {
+            warningPopupEl.classList.remove('opacity-100', 'scale-100');
+            warningPopupEl.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+            setTimeout(() => {
+                warningPopupEl.classList.add('hidden');
+            }, 300);
         }
+    }
 
-        window.onload = function() {
-            fetchAirQualityData();            
-            setInterval(fetchAirQualityData, 5000); 
-        };
-    </script>
+    async function fetchAirQualityData() {
+        try {
+            const response = await fetch('/api/airquality');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+            const result = await response.json();
+            if (result.status !== "success" || !result.data) {
+                throw new Error("Invalid data format from server");
+            }
+
+            // Extract actual data
+            const { aqi, temperature, humidity, city, timestamp } = result.data;
+
+            if (aqi == null) throw new Error("AQI missing in response");
+
+            const category = getAqiCategory(aqi);
+
+            // Update AQI number
+            aqiValueEl.textContent = aqi;
+
+            // Update ring color
+            aqiRingEl.className = `relative w-40 h-40 md:w-52 md:h-52 flex items-center justify-center rounded-full border-8 transition duration-500 ease-in-out ${category.ringColor}`;
+
+            // Update status badge
+            aqiStatusEl.textContent = category.status;
+            aqiStatusEl.className = `text-2xl md:text-3xl font-semibold mt-4 py-1 px-4 rounded-full text-white shadow-lg transition duration-500 ease-in-out ${category.color}`;
+
+            // Health advice
+            healthAdviceEl.textContent = category.advice;
+
+            // Location & time
+            const timeStr = new Date(timestamp * 1000).toLocaleTimeString();
+            lastUpdatedEl.textContent = timeStr;
+            locationDisplayEl.textContent = `Location: ${city || 'Unknown'}`;
+
+            // Trigger popup if AQI > threshold
+            handleWarningPopup(aqi);
+
+        } catch (error) {
+            console.error("Could not fetch air quality data:", error);
+            aqiValueEl.textContent = 'ERR';
+            aqiStatusEl.textContent = 'Error';
+            healthAdviceEl.textContent = 'Failed to load air quality data. Check server connection.';
+        }
+    }
+
+    window.onload = function () {
+        fetchAirQualityData();
+        setInterval(fetchAirQualityData, 5000);
+    };
+</script>
+
 </body>
 </html>
