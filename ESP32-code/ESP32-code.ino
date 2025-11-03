@@ -1,16 +1,21 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <math.h>
 
 // ------------------------------------------------------------
-const char* ssid = "Your wifi name";
-const char* password = "your wifi password";
+const char* ssid = "SES Private wifi";
+const char* password = "helloworld";
 // ------------------------------------------------------------
 
-const char* serverName = "http://<your network ip>:5000/receive_data"; 
+const char* serverName = "http://10.81.200.99:5000/receive_data"; 
 const int airQ = 34;
 
 float VREF = 3.3;
 int ADC_RES = 4095;
+
+// You must calibrate this value for your own MQ135 in clean air
+float RLOAD = 10.0;  // Load resistor (kΩ)
+float RZERO = 10.0;  // Will be updated after calibration
 
 void setup() {
   Serial.begin(115200);
@@ -29,15 +34,35 @@ void setup() {
 void loop() {
   int rawValue = analogRead(airQ);
   float voltage = (rawValue * VREF) / ADC_RES;
+
+  // Calculate sensor resistance RS
+  float RS = ((VREF * RLOAD) / voltage) - RLOAD;
+  float ratio = RS / RZERO;
+
   float gasConcentration = voltage * 1000;
   int aqi = calculateAQI(gasConcentration);
 
+  // Estimate gas concentrations
+  float co2ppm = getCO2PPM(ratio);
+  float smokeLevel = getSmokeIndex(voltage);
+
+  Serial.print("Raw: "); Serial.print(rawValue);
+  Serial.print(" | Voltage: "); Serial.print(voltage);
+  Serial.print("V | CO2: "); Serial.print(co2ppm);
+  Serial.print(" ppm | Smoke: "); Serial.print(smokeLevel);
+  Serial.print(" | AQI: "); Serial.println(aqi);
+
+  // Send to Flask server
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
     http.begin(serverName);
     http.addHeader("Content-Type", "application/json");
 
-    String jsonData = "{\"aqi\": " + String(aqi) + ", \"temperature\": null, \"humidity\": null}";
+    String jsonData = "{\"aqi\": " + String(aqi) +
+                      ", \"co2\": " + String(co2ppm) +
+                      ", \"smoke\": " + String(smokeLevel) +
+                      ", \"temperature\": null, \"humidity\": null}";
+
     int httpResponseCode = http.POST(jsonData);
 
     if (httpResponseCode > 0) {
@@ -49,18 +74,42 @@ void loop() {
     http.end();
   }
 
-  delay(1000); 
+  delay(2000); 
 }
 
-int calculateAQI(float concentration) {
-  if (concentration <= 400)
-    return map(concentration, 0, 400, 0, 50);
-  else if (concentration <= 1000)
-    return map(concentration, 400, 1000, 51, 100);
-  else if (concentration <= 2000)
-    return map(concentration, 1000, 2000, 101, 150);
-  else if (concentration <= 5000)
-    return map(concentration, 2000, 5000, 151, 200);
+// ----------------------------
+// Estimate CO2 concentration (ppm)
+float getCO2PPM(float ratio) {
+  // Empirical formula for MQ135 CO₂
+  // log(ppm) = a * log(RS/R0) + b
+  // Derived constants from datasheet curve
+  float a = -2.769034857;
+  float b = 2.066;
+  float ppm = 116.6020682 * pow(ratio, a);
+  return ppm;
+}
+
+// ----------------------------
+// Estimate smoke level (0–100 scale)
+float getSmokeIndex(float voltage) {
+  // Convert voltage to a relative smoke index (arbitrary scale)
+  // Higher voltage = more smoke
+  float index = (voltage / VREF) * 100.0;
+  if (index > 100) index = 100;
+  return index;
+}
+
+// ----------------------------
+// Estimate simple AQI from CO₂
+int calculateAQI(float co2ppm) {
+  if (co2ppm <= 400)
+    return map(co2ppm, 0, 400, 0, 50);
+  else if (co2ppm <= 1000)
+    return map(co2ppm, 400, 1000, 51, 100);
+  else if (co2ppm <= 2000)
+    return map(co2ppm, 1000, 2000, 101, 150);
+  else if (co2ppm <= 5000)
+    return map(co2ppm, 2000, 5000, 151, 200);
   else
     return 300;
 }
