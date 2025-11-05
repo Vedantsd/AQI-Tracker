@@ -4,6 +4,7 @@ import threading
 import requests
 import smtplib
 import os
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -77,9 +78,6 @@ def fetch_location_data():
     return "Unknown"
 
 
-
-
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -112,7 +110,7 @@ def receive_data():
             "city": city
         })
 
-        print(f"📡 Received -> AQI: {aqi}, CO2: {co2} ppm, Smoke: {smoke}, Temp: {temp}, Hum: {hum}")
+        print(f"Received -> AQI: {aqi}, CO2: {co2} ppm, Smoke: {smoke}, Temp: {temp}, Hum: {hum}")
 
         if aqi and aqi > 150:
             threading.Thread(target=send_bulk_email).start()
@@ -120,7 +118,7 @@ def receive_data():
         return jsonify({"status": "success", "message": "Data received"}), 200
 
     except Exception as e:
-        print(f"❌ Error receiving data: {e}")
+        print(f"Error receiving data: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/airquality', methods=['GET'])
@@ -132,6 +130,35 @@ def air_quality_api():
         "status": "success",
         "data": latest_sensor_data
     })
+
+def save_email_to_file(email):
+    email = email.strip()
+    if not email:
+        return False
+
+    try:
+        with open("emails.csv", "a") as f:
+            f.write("\n" + email + ",")
+        print(f"New subscription saved: {email}")
+        return True
+    except Exception as e:
+        print(f"Error writing to emails.csv: {e}")
+        return False
+
+
+@app.route('/subscribe', methods=["GET", "POST"])
+def subscribe():
+    if request.method == "POST":
+        email = request.form.get('email')
+        if not email or "@" not in email:
+            return jsonify({"status": "error", "message": "A valid email is required"}), 400
+
+        if not save_email_to_file(email):
+            return jsonify({"status": "error", "message": "Could not save email due to server error"}), 500
+        time.sleep(3)
+
+    return render_template('subscribe.html')
+
 
 if __name__ == '__main__':
     city = fetch_location_data()

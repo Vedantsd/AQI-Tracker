@@ -3,19 +3,18 @@
 #include <math.h>
 
 // ------------------------------------------------------------
-const char* ssid = "SES Private wifi";
-const char* password = "helloworld";
+const char* ssid = "OPPO F17";
+const char* password = "12345678";
 // ------------------------------------------------------------
 
-const char* serverName = "http://10.81.200.99:5000/receive_data"; 
+const char* serverName = "http://10.236.15.197:5000/receive_data"; 
 const int airQ = 34;
 
 float VREF = 3.3;
 int ADC_RES = 4095;
 
-// You must calibrate this value for your own MQ135 in clean air
-float RLOAD = 10.0;  // Load resistor (kΩ)
-float RZERO = 10.0;  // Will be updated after calibration
+float RLOAD = 10.0;
+float RZERO = 10.0;  // Will be updated after 
 
 void setup() {
   Serial.begin(115200);
